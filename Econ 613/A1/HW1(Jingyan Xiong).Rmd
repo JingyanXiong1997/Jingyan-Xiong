@@ -6,15 +6,14 @@ Author:Jingyan Xiong
 ## Exercise 1 Missing data
 
 ```{R}
-#number of student
+#number of students
 length(datstu$X)
 
-#number of school
+#number of schools
 schcode = datstu[,5:10]
 B1 = c(schcode[,1],schcode[,2],schcode[,3],schcode[,4],schcode[,5],schcode[,6])
 length(unique(as.vector(B1)))
 
-length(unique(datsss[,3]))
 
 #number of programs
 procode = datstu[,11:16]
@@ -34,7 +33,7 @@ length(unique(c(sp[[1]],sp[[2]],sp[[3]],sp[[4]],sp[[5]],sp[[6]])))
 #number of missing test score
 sum(is.na(datstu[,2]))
 
-#students who apply to same school different program
+#students who apply to same school
 B2 = cbind(schcode[,1],schcode[,2],schcode[,3],schcode[,4],schcode[,5],schcode[,6])
 
 
@@ -60,9 +59,8 @@ find_same_school = function(Z){
 
 find_same_school(B2)
 
-#number of studetns who apply to less than 6 choices
+#number of students who apply to less than 6 choices
 B = sp[[6]]
-length(B[schcode[,6] == "NA"])
 length(B[procode[,6] == ""])
 ```
 
@@ -236,6 +234,21 @@ Y <- 0.5 + 1.2*X1 - 0.9*X2 + 0.1*X3 + e
 # create ydum
 ydum <- ifelse(Y>mean(Y), 1, 0)
 
+X1[1:20]
+X2[1:20]
+X3[1:20]
+e[1:20]
+Y[1:20]
+ydum[1:20]
+
+```
+
+
+
+
+## Exercise 6 OLS
+
+```{r}
 # correlation between Y and X1 
 cor(Y, X1)
 cor(Y, X1) - 1.2
@@ -244,25 +257,6 @@ cor(Y, X1) - 1.2
 X <- cbind(rep(1,10000), X1, X2, X3)
 beta <- solve(t(X)%*%X)%*%t(X)%*%Y
 beta
-```
-
-
-## Exercise 6 OLS
-
-```{r}
-correlation = cor(Y,X1)
-correlation
-#0.2 is quite different with 1.2
-
-X = cbind(rep(1,10000), X1,X2,X3)
-coeff = solve(t(X) %*% X) %*% t(X) %*% Y
-print(coeff)
-
-
-ee = Y - X %*% coeff
-S_2 = 1/(10000-4)*sum(ee^2)
-SE = sqrt(S_2 * solve(t(X) %*% X))
-print(diag(SE))
 ```
 
 
