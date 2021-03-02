@@ -1,0 +1,302 @@
+---
+title: "HW1"
+Author:Jingyan Xiong
+---
+
+## Exercise 1 Missing data
+
+```{R}
+#number of student
+length(datstu$X)
+
+#number of school
+schcode = datstu[,5:10]
+B1 = c(schcode[,1],schcode[,2],schcode[,3],schcode[,4],schcode[,5],schcode[,6])
+length(unique(as.vector(B1)))
+
+length(unique(datsss[,3]))
+
+#number of programs
+procode = datstu[,11:16]
+B2 = cbind(procode[,1],procode[,2],procode[,3],procode[,4],procode[,5],procode[,6])
+length(unique(as.vector(B2)))
+
+#number of choices
+k = 1
+sp = list()
+while (k<=6){
+  sp[[k]] = paste(schcode[,k],procode[,k])
+  k = k+1
+}
+
+length(unique(c(sp[[1]],sp[[2]],sp[[3]],sp[[4]],sp[[5]],sp[[6]])))
+
+#number of missing test score
+sum(is.na(datstu[,2]))
+
+#students who apply to same school different program
+B2 = cbind(schcode[,1],schcode[,2],schcode[,3],schcode[,4],schcode[,5],schcode[,6])
+
+
+find_same_school = function(Z){
+  m = nrow(Z)
+  n = ncol(Z)
+  A = c()
+  for (i in 1:n-1){
+    for (j in (i+1):n){
+      x = Z[,i] == Z[,j]
+      A = cbind(A, x)
+    }
+  }
+  
+  num = 0
+  for (i in 1:m)(
+    if (TRUE %in% A[i,]){
+      num = num + 1
+    }
+  )
+  return(num)
+}
+
+find_same_school(B2)
+
+#number of studetns who apply to less than 6 choices
+B = sp[[6]]
+length(B[schcode[,6] == "NA"])
+length(B[procode[,6] == ""])
+```
+
+
+
+## Exercise 2 Data
+
+```{r}
+B = datstu$rankplace
+table(B)
+
+B1 = c(schcode[,1],schcode[,2],schcode[,3],schcode[,4],schcode[,5],schcode[,6])
+B2 = c(procode[,1],procode[,2],procode[,3],procode[,4],procode[,5],procode[,6])
+schlevel = data.frame("schoolcode" = B1, "programcode" = B2)
+datsss1 = unique(datsss[3:6])
+B3 = merge(schlevel, datsss1, by.x = "schoolcode", by.y = "schoolcode", all.x = T)
+datsss_clean = unique(B3[complete.cases(B3[,4]),])
+datsss_clean = cbind(datsss_clean, paste(datsss_clean[,1],datsss_clean[,2]))
+colnames(datsss_clean) = c("schoolcode","programcode",'sssdistrict','ssslong','ssslat','sp')
+
+
+no_na_score = datstu[complete.cases(datstu[,2]),]
+find_sp_student = function(test1){
+  A = data.frame()
+  for (i in 1:6){
+    a = cbind(test1[test1$rankplace==i,2],test1[test1$rankplace==i,(4+i)],test1[test1$rankplace==i,(10+i)])
+    A = rbind(A,a)
+  }
+  A = cbind(A, paste(A[,2],A[,3]))
+  return(A)
+}
+sp_student = find_sp_student(no_na_score)
+names(sp_student) = c("score","s",'p','sp')
+sp_student$score = as.numeric(sp_student$score)
+library(dplyr)
+planes = group_by(sp_student, sp)
+sp_clean = data.frame(summarise(planes,cutoff = min(score),quality = mean(score), size = n()))
+
+
+school_level = merge(datsss_clean, sp_clean, by = 'sp', all.x = T, all.y = T)
+
+print(school_level[1:20,])
+```
+
+
+
+## Exercise 3 Distance
+
+```{r}
+dis_s = unique(datsss_clean[,3:5])
+dis_j = unique(datjss[,2:4])
+
+
+dis_js = c()
+dis_js = cbind(dis_js, dis_s[,1])
+
+for(i in 1:nrow(dis_j)){
+  jsslong = dis_j[i,2]
+  jsslat = dis_j[i,3]
+  
+  A = (69.172*(dis_s[,2]-jsslong)*cos(jsslat/57.3))^2
+  B = (69.172*(dis_s[,3]-jsslat))^2
+  S = sqrt(A+B)
+  
+  dis_js = cbind(dis_js, S)
+  colnames(dis_js)[colnames(dis_js) == 'S'] = dis_j[i,1]
+}
+
+rownames(dis_js) = dis_js[,1]
+dis_js = dis_js[,-1]
+
+install.packages("reshape2")
+library(reshape2)
+dis_js_long = melt(dis_js, id.vars = "V1")
+colnames(dis_js_long) = c('sssdis','jssdis','distance')
+
+print(dis_js_long[1:20,])
+```
+
+
+
+## Exercise 4 Descriptive Characteristics
+
+```{r}
+get_rank_choice = function(i){
+  te = cbind(no_na_score$score, paste(no_na_score[,(4+i)],no_na_score[,(10+i)]),no_na_score[,17])
+  colnames(te) = c('score', 'sp', 'jssdis')
+  te1 = merge(te, school_level, by.x = 'sp', by.y = 'sp', all.x=TRUE)
+  te1 = cbind(te1, paste(te1$sssdistrict, te1$jssdis))
+  colnames(te1)[12] = 'sj'
+  
+  te2 = cbind(dis_js_long, paste(dis_js_long$sssdis, dis_js_long$jssdis))
+  colnames(te2)[4] = 'sj'
+  
+  te3 = merge(te1, te2, by.x = 'sj', by.y = 'sj', all.x = TRUE)
+  te3$score = as.numeric(te3$score)
+  te3$cutoff = as.numeric(te3$cutoff)
+  te3$quality = as.numeric(te3$quality)
+  te3$distance = as.numeric(te3$distance)
+  return(te3)
+}
+
+report_1 = function(te3){
+  a = c(mean(te3$cutoff,na.rm = TRUE), sd(te3$cutoff, na.rm = TRUE),mean(te3$quality, na.rm = TRUE),sd(te3$quality, na.rm = TRUE),mean(te3$distance, na.rm = TRUE),sd(te3$distance,na.rm = TRUE))
+  return(a)
+}
+
+change_name = function(table1){
+  rownames(table1) = c('rank1','rank2','rank3','rank4','rank5','rank6')
+  colnames(table1) = c('avg_cutoff','sd_cutoff','avg_quality','sd_quality','avg_distance','sd_distance')
+  return(table1)
+}
+
+table1 = c()
+table_25 = c()
+table_50 = c()
+table_75 = c()
+table_100 = c()
+
+for (i in 1:6){
+  te = get_rank_choice(i)
+  rank = report_1(te)
+  table1 = rbind(table1, rank)
+  
+  t_25 = te[te$score <= quantile(te$score, 0.25),]
+  rank_25 = report_1(t_25)
+  table_25 = rbind(table_25, rank_25)
+  
+  
+  t_50 = te[te$score > quantile(te$score, 0.25) & te$score <= quantile(te$score, 0.5),]
+  table_50 = rbind(table_50, report_1(t_50))
+  
+  t_75 = te[te$score > quantile(te$score, 0.5) & te$score <= quantile(te$score, 0.75),]
+  table_75 = rbind(table_75, report_1(t_75))
+  
+  t_100 = te[te$score > quantile(te$score, 0.75),]
+  table_100 = rbind(table_100, report_1(t_100))
+}
+
+
+table1 = change_name(table1)
+print(table1)
+
+table_25 = change_name(table_25)
+print(table_25)
+
+table_50 = change_name(table_50)
+print(table_50)
+
+table_75 = change_name(table_75)
+print(table_75)
+
+table_100 = change_name(table_100)
+print(table_100)
+```
+
+
+
+## Exercise 5  Data creation
+
+```{r}
+set.seed(1234)
+X1 <- runif(n = 10000, min = 1, max = 3)
+X2 <- rgamma(n = 10000, shape = 3, scale = 2)
+X3 <- rbinom(n = 10000, size = 1, prob = 0.3)
+e <- rnorm(n = 10000, mean = 2, sd = 1) 
+
+# create Y
+Y <- 0.5 + 1.2*X1 - 0.9*X2 + 0.1*X3 + e
+
+# create ydum
+ydum <- ifelse(Y>mean(Y), 1, 0)
+
+# correlation between Y and X1 
+cor(Y, X1)
+cor(Y, X1) - 1.2
+
+# coefficient
+X <- cbind(rep(1,10000), X1, X2, X3)
+beta <- solve(t(X)%*%X)%*%t(X)%*%Y
+beta
+```
+
+
+## Exercise 6 OLS
+
+```{r}
+correlation = cor(Y,X1)
+correlation
+#0.2 is quite different with 1.2
+
+X = cbind(rep(1,10000), X1,X2,X3)
+coeff = solve(t(X) %*% X) %*% t(X) %*% Y
+print(coeff)
+
+
+ee = Y - X %*% coeff
+S_2 = 1/(10000-4)*sum(ee^2)
+SE = sqrt(S_2 * solve(t(X) %*% X))
+print(diag(SE))
+```
+
+
+## Exercise 7 Discrete choice
+
+```{r}
+probit = glm(ydum ~ X1 + X2+ X3, family = binomial(link = "probit"))
+summary(probit)
+
+linear = lm(ydum ~ X1 + X2+ X3)
+summary(linear)
+
+
+logit = glm(ydum ~ X1 + X2+ X3, family = binomial)
+summary(logit)              
+
+
+# compare the above three models
+## The absolute values of coefficients of the probit model is smaller than 
+## the absolute values of coefficients of the logit model.
+## The estimated coefficients of the linear model is very similar to 
+## the estimated coefficients of the logit model.
+##For the three models, their estimated coefficients are all significant.
+```
+
+
+## Exercise 8 Marginal Effects
+
+```{r}
+# marginal effect of profit model and the standard error
+library(mfx)
+data <- as.data.frame(cbind(ydum, X1, X2, X3))
+probitmfx(ydum ~X1+X2+X3, data=data, atmean = TRUE)
+
+# marginal effect of logit model and the standard error
+logitmfx(ydum ~ X1+X2+X3, data=data, atmean = TRUE)
+```
