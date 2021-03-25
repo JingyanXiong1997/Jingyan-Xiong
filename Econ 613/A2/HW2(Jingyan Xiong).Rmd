@@ -228,8 +228,4 @@ mixlogit_movecho <- function(theta, X1, X2, Y){
 beta_r <- as.vector(optim(c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0), mixlogit_movecho, X1=price3, X2=inc2, method = "BFGS")$par)
 print(beta_r)
 
-Lr_f <- -mixlogit_movecho(beta_f[c(2:10,12:19)], X1=price3, X2=inc2) 
-Lr_r <- -mixlogit_movecho(beta_r, X1=price3, X2=inc2) 
-MTT <- -2*(Lr_f-Lr_r) 
-print(MTT)
 ```
