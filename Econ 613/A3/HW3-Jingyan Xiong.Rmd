@@ -1,0 +1,122 @@
+---
+title: "HW3"
+author: "Jingyan Xiong"
+---
+
+
+## Exercise 1  Links to the datasets
+```{r}
+officers <- read.csv("C:/Users/HW/Desktop/Econ613-master/Assignments/A3/officers.csv")
+View(officers)
+population <- read.csv("C:/Users/HW/Desktop/Econ613-master/Assignments/A3/population.csv")
+View(population)
+crime_long <- read.csv("C:/Users/HW/Desktop/Econ613-master/Assignments/A3/crime_long.csv")
+View(crime_long)
+```
+
+```{r}
+install.packages("tidyr")
+library(tidyr)
+```
+
+## Exercise 2  Data Manipulation
+```{r}
+# Calculate total crime per month and plot the time series of crime
+crime_month = aggregate(crime_long$crimes, by=list(crime_long$crime_month), FUN=sum)
+head(crime_month)
+plot.ts(crime_month, xlab = 'Year', ylab = 'Total crime', xaxt = 'n')
+axis(side = 1, at = 2002:2019)
+```
+
+```{r}
+# Merge the two datasets by districts-units and period
+temp = unite(population,'mu',month, district,sep='sss')
+ttmp = unite(crime_long,'mu',crime_month, district,sep='sss')
+m1 = merge(temp, ttmp, by='mu')
+m2 = separate(m1, mu, c('month','unit'), sep='sss',remove = FALSE)
+m2[,2] = as.Date(m2[,2], format = '%Y-%m-%d')
+head(m2)
+```
+
+```{r}
+# Construct a panel data of unit over time with the following variables
+t1 = aggregate(m2[,c('crimes')], by=list(m2$mu), FUN=sum)
+t2 = aggregate(m2[,c('tot_pop','tot_white','tot_black','tot_hisp')], by=list(m2$mu), FUN=max)
+t3 = merge(t1,t2,by='Group.1',all = TRUE)
+m2_v = m2[m2$crime_type == 'violent',]
+t4 = aggregate(m2_v[,c('crimes')], by=list(m2_v$mu), FUN=sum)
+m2_p = m2[m2$crime_type == 'property',]
+t5 =aggregate(m2_p[,c('crimes')], by=list(m2_p$mu), FUN=sum)
+t6 = aggregate(m2[,c('p50_inc')], by=list(m2$mu), FUN=median)
+m3 = cbind(t3$Group.1, t3$x/t3$tot_pop, t4$x/t3$tot_pop, t5$x/t3$tot_pop, t6$x, t3[4:6]/t3$tot_pop)
+colnames(m3) = c('mu','tc','vc','pc','inc','white','black','hisp')
+m3 = separate(m3, mu, c('month','unit'), sep='sss',remove = FALSE)
+m3[,2] = as.Date(m3[,2], format = '%Y-%m-%d')
+head(m3)
+```
+
+
+## Exercise 3  Panel Data: Introduction
+```{r}
+pop_crime <- merge(population, crime, by.x = c('month', 'district'), by.y = c('crime_month', 'district'))
+pop_crime$crime <- rowSums(pop_crime[,c('drug', 'property', 'violent', 'other')])
+pop_crime$black <- pop_crime$tot_black / pop_crime$tot_pop
+pop_crime$white <- pop_crime$tot_white / pop_crime$tot_pop
+pop_crime$hisp <- pop_crime$tot_hisp / pop_crime$tot_pop
+opc <- merge(officers, pop_crime, by.x = c('month', 'unit'), by.y = c('month', 'district'))
+l1 <- lm('arrest ~ tenure + crime + p50_inc + black + white + hisp', opc)
+l1
+```
+
+
+## Exercise 4  Panel Data: More controls
+```{r}
+l2 <- lm('arrest ~ tenure + crime + p50_inc + black + white + hisp + factor(unit) + factor(month)', opc)
+l2
+```
+
+
+## Exercise 5  Panel Data: Individual fixed effects
+```{r}
+# between estimator
+m4 = merge(m3,officers_u,by='mu')
+m4_1 = aggregate(m4, list(m4$NUID, m4$unit), mean)
+m4_1$unit = m4_1$Group.2
+lm3 = lm(arrest ~ tenure + tc + inc + black + hisp + white + factor(unit), data=m4_1)
+summary(lm3)
+```
+
+
+```{r}
+# within estimator
+mean_1 = m4_1[,c('NUID','arrest','tenure','tc','inc','black','hisp','white')]
+colnames(mean_1) = c('NUID','arrest_mean','tenure_mean','tc_mean','inc_mean','black_mean','hisp_mean','white_mean')
+m4_within = merge(m4,mean_1,by='NUID')
+m4_within$arrest_within = m4_within$arrest - m4_within$arrest_mean
+m4_within$tenure_within = m4_within$tenure - m4_within$tenure_mean
+m4_within$tc_within = m4_within$tc - m4_within$tc_mean
+m4_within$inc_within = m4_within$inc - m4_within$inc_mean
+m4_within$black_within = m4_within$black - m4_within$black_mean
+m4_within$hisp_within = m4_within$hisp - m4_within$hisp_mean
+m4_within$white_within = m4_within$white - m4_within$white_mean
+
+lm4 = lm(arrest_within ~ tenure_within + tc_within + inc_within + black_within + hisp_within + white_within + factor(unit)+factor(month) - 1 , data=m4_within)
+summary(lm4)
+```
+
+
+```{r}
+# first difference estimator
+m4_di = m4[order(m4$NUID, m4$month),]
+m4_di1 = as.data.frame(lapply(m4_di,as.numeric))
+m4_di1$month = m4_di$month
+
+m4_di2 = m4_di1[-1,] - m4_di1[-nrow(m4_di1),]
+m4_di2 = rbind(c(0,1,0,0,0), m4_di2)
+m4_di3 = m4_di2[m4_di2$NUID == 0,]
+lm5 = lm(arrest ~ tenure + tc + inc + black + hisp + white + factor(unit), data=m4_di3)
+summary(lm5)
+```
+
+
+
